@@ -5,6 +5,14 @@
 [![pull requests](https://oselvar.com/api/badge?label=pull%20requests&csvUrl=https%3A%2F%2Fraw.githubusercontent.com%2Fcucumber%2Foselvar-github-metrics%2Fmain%2Fdata%2Fcucumber%2Fgodog%2FpullRequests.csv)](https://oselvar.com/github/cucumber/oselvar-github-metrics/main/cucumber/godog)
 [![issues](https://oselvar.com/api/badge?label=issues&csvUrl=https%3A%2F%2Fraw.githubusercontent.com%2Fcucumber%2Foselvar-github-metrics%2Fmain%2Fdata%2Fcucumber%2Fgodog%2Fissues.csv)](https://oselvar.com/github/cucumber/oselvar-github-metrics/main/cucumber/godog)
 
+# Why fork?
+
+Due to requests to natively support passing of the `*testing.T` to the step definition fuctions to allow natively calling assertion functions from packages like [`testify`](https://github.com/stretchr/testify), I decided to fork the original one evening and have a play around with the [functional options pattern](https://golang.design/research/generic-option/).
+
+I got as far as implementing a StepV2 function, but then realised I'd need to implement a StepV2 StepDefinition model, and end up re-writing most of how GoDog was implemented. So I let go of my stubborness and decided their workaround was good enough.
+
+But I had fun, and learned a thing or two. Hope you do too poking around in this fork. :)
+
 # Godog
 
 <p align="center"><img src="logo.png" alt="Godog logo" style="width:250px;" /></p>
@@ -305,7 +313,7 @@ func InitializeScenario(sc *godog.ScenarioContext) {
 
 ```
 
-In this example we are using `context.Context` to pass the state between the steps. 
+In this example we are using `context.Context` to pass the state between the steps.
 Every scenario starts with an empty context and then steps and hooks can add relevant information to it.
 Instrumented context is chained through the steps and hooks and is safe to use when multiple scenarios are running concurrently.
 
@@ -334,8 +342,8 @@ PASS
 ok      command-line-arguments  0.130s
 ```
 
-You may hook to `ScenarioContext` **Before** event in order to reset or pre-seed the application state before each scenario. 
-You may hook into more events, like `sc.StepContext()` **After** to print all state in case of an error. 
+You may hook to `ScenarioContext` **Before** event in order to reset or pre-seed the application state before each scenario.
+You may hook into more events, like `sc.StepContext()` **After** to print all state in case of an error.
 Or **BeforeSuite** to prepare a database.
 
 By now, you should have figured out, how to use **godog**. Another advice is to make steps orthogonal, small and simple to read for a user. Whether the user is a dumb website user or an API developer, who may understand a little more technical context - it should target that user.
@@ -373,7 +381,7 @@ See implementation examples:
 
 ### Running Godog with go test
 
-You may integrate running **godog** in your **go test** command. 
+You may integrate running **godog** in your **go test** command.
 
 #### Subtests of *testing.T
 
@@ -419,7 +427,7 @@ go test -test.v -test.run ^TestFeatures$/^my_scenario$
 
 #### TestMain
 
-You can run test suite using go [TestMain](https://golang.org/pkg/testing/#hdr-Main) func available since **go 1.4**. 
+You can run test suite using go [TestMain](https://golang.org/pkg/testing/#hdr-Main) func available since **go 1.4**.
 In this case it is not necessary to have **godog** command installed. See the following examples.
 
 The following example binds **godog** flags with specified prefix `godog` in order to prevent flag collisions.

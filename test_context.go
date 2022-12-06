@@ -5,10 +5,10 @@ import (
 	"fmt"
 	"reflect"
 	"regexp"
+	"testing"
 
 	"github.com/cucumber/godog/formatters"
 	"github.com/cucumber/godog/internal/builder"
-	"github.com/cucumber/godog/internal/flags"
 	"github.com/cucumber/godog/internal/models"
 	"github.com/cucumber/messages-go/v16"
 )
@@ -302,6 +302,58 @@ func (ctx *ScenarioContext) Step(expr, stepFunc interface{}) {
 	ctx.suite.steps = append(ctx.suite.steps, def)
 }
 
+func (ctx *ScenarioContext) StepV2(expr, stepFunc interface{}, testingT *testing.T) {
+	var regex *regexp.Regexp
+
+	switch t := expr.(type) {
+	case *regexp.Regexp:
+		regex = t
+	case string:
+		regex = regexp.MustCompile(t)
+	case []byte:
+		regex = regexp.MustCompile(string(t))
+	default:
+		panic(fmt.Sprintf("expecting expr to be a *regexp.Regexp or a string, got type: %T", expr))
+	}
+
+	v := reflect.ValueOf(stepFunc)
+	typ := v.Type()
+	if typ.Kind() != reflect.Func {
+		panic(fmt.Sprintf("expected handler to be func, but got: %T", stepFunc))
+	}
+
+	if typ.NumOut() > 2 {
+		panic(fmt.Sprintf("expected handler to return either zero, one or two values, but it has: %d", typ.NumOut()))
+	}
+
+	def := &models.StepDefinition{
+		StepDefinition: formatters.StepDefinition{
+			Handler: stepFunc,
+			Expr:    regex,
+		},
+		HandlerValue: v,
+	}
+
+	if typ.NumOut() == 1 {
+		typ = typ.Out(0)
+		switch typ.Kind() {
+		case reflect.Interface:
+			if !typ.Implements(errorInterface) && !typ.Implements(contextInterface) {
+				panic(fmt.Sprintf("expected handler to return an error or context.Context, but got: %s", typ.Kind()))
+			}
+		case reflect.Slice:
+			if typ.Elem().Kind() != reflect.String {
+				panic(fmt.Sprintf("expected handler to return []string for multistep, but got: []%s", typ.Elem().Kind()))
+			}
+			def.Nested = true
+		default:
+			panic(fmt.Sprintf("expected handler to return an error or []string, but got: %s", typ.Kind()))
+		}
+	}
+
+	ctx.suite.steps = append(ctx.suite.steps, def)
+}
+
 // Build creates a test package like go test command at given target path.
 // If there are no go files in tested directory, then
 // it simply builds a godog executable to scan features.
@@ -317,5 +369,3 @@ func (ctx *ScenarioContext) Step(expr, stepFunc interface{}) {
 func Build(bin string) error {
 	return builder.Build(bin)
 }
-
-type Feature = flags.Feature
