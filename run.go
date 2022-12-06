@@ -33,7 +33,23 @@ const (
 )
 
 type testSuiteInitializer func(*TestSuiteContext)
+
 type scenarioInitializer func(*ScenarioContext)
+type scenarioInitializerV2 func(*ScenarioContext, *testing.T)
+
+type scenarioInitializerCore struct {
+	usingV2       bool
+	initializerV1 func(*ScenarioContext)
+	initializerV2 func(*ScenarioContext, *testing.T)
+}
+
+func (i scenarioInitializerCore) initialize(ctx *ScenarioContext, t *testing.T) {
+	if i.usingV2 {
+		i.initializerV2(ctx, t)
+	} else {
+		i.initializerV1(ctx)
+	}
+}
 
 type runner struct {
 	randomSeed            int64
@@ -44,8 +60,8 @@ type runner struct {
 
 	features []*models.Feature
 
-	testSuiteInitializer testSuiteInitializer
-	scenarioInitializer  scenarioInitializer
+	testSuiteInitializer    testSuiteInitializer
+	scenarioInitializerCore *scenarioInitializerCore
 
 	storage *storage.Storage
 	fmt     Formatter
@@ -115,9 +131,9 @@ func (r *runner) concurrent(rate int) (failed bool) {
 				// Copy base suite.
 				suite := *testSuiteContext.suite
 
-				if r.scenarioInitializer != nil {
+				if r.scenarioInitializerCore != nil {
 					sc := ScenarioContext{suite: &suite}
-					r.scenarioInitializer(&sc)
+					r.scenarioInitializerCore.initialize(&sc, r.testingT)
 				}
 
 				err := suite.runPickle(pickle)
@@ -209,7 +225,7 @@ func runWithOptions(suiteName string, runner runner, opt Options) int {
 	if opt.ShowStepDefinitions {
 		s := suite{}
 		sc := ScenarioContext{suite: &s}
-		runner.scenarioInitializer(&sc)
+		runner.scenarioInitializerCore.initialize(&sc, nil)
 		printStepDefinitions(s.steps, output)
 		return exitOptionError
 	}
@@ -300,7 +316,7 @@ func runsFromPackage(fp string) string {
 type TestSuite struct {
 	Name                 string
 	TestSuiteInitializer func(*TestSuiteContext)
-	ScenarioInitializer  func(*ScenarioContext)
+	ScenarioInitializer  *scenarioInitializerCore
 	Options              *Options
 }
 
@@ -330,9 +346,51 @@ func (ts TestSuite) Run() int {
 
 		return 0
 	}
-
-	r := runner{testSuiteInitializer: ts.TestSuiteInitializer, scenarioInitializer: ts.ScenarioInitializer}
+	r := runner{testSuiteInitializer: ts.TestSuiteInitializer, scenarioInitializerCore: ts.ScenarioInitializer}
 	return runWithOptions(ts.Name, r, *ts.Options)
+}
+
+func WithScenarioInitializerV1(initializer func(*ScenarioContext)) func(*scenarioInitializerConfig) {
+	return func(config *scenarioInitializerConfig) {
+		config.InitializeV1Function = initializer
+		config.InitializerV1 = true
+	}
+}
+
+func WithScenarioInitializerV2(initializer func(*ScenarioContext, *testing.T)) func(*scenarioInitializerConfig) {
+	return func(config *scenarioInitializerConfig) {
+		config.InitializeV2Function = initializer
+		config.InitializerV2 = true
+	}
+}
+
+func NewScenarioInitializerCore(options ...ScenarioInitializerOption) *scenarioInitializerCore {
+	scenarioInitializerCore := &scenarioInitializerCore{}
+
+	// Default values if any were to be provided would be provided here
+	config := scenarioInitializerConfig{}
+	for _, option := range options {
+		option(&config)
+	}
+	if config.InitializerV1 {
+		scenarioInitializerCore.initializerV1 = config.InitializeV1Function
+	}
+	if config.InitializerV2 {
+		scenarioInitializerCore.initializerV2 = config.InitializeV2Function
+		scenarioInitializerCore.usingV2 = true
+	}
+
+	return scenarioInitializerCore
+}
+
+type ScenarioInitializerOption func(*scenarioInitializerConfig)
+
+type scenarioInitializerConfig struct {
+	InitializeV1Function func(*ScenarioContext)
+	InitializeV2Function func(*ScenarioContext, *testing.T)
+
+	InitializerV1 bool
+	InitializerV2 bool
 }
 
 // RetrieveFeatures will parse and return the features based on test suite option

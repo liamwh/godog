@@ -1,0 +1,29 @@
+package scenarios
+
+import (
+  OBFUSCATED
+)
+
+func TestFeatures(t *testing.T) {
+	scenarioInitializerOptions := []godog.ScenarioInitializerOption{
+		godog.WithScenarioInitializerV2(InitializeScenario),
+	}
+	scenarioInitializer := godog.NewScenarioInitializerCore(scenarioInitializerOptions...)
+	suite := godog.TestSuite{
+		ScenarioInitializer: scenarioInitializer,
+		Options: &godog.Options{
+			Format:                      "pretty",
+			Paths:                       []string{"features"},
+			TestingT:                    t, // Testing instance that will run subtests.
+			UsingV2ScenarioInitializers: true,
+		},
+	}
+
+	if suite.Run() != 0 {
+		t.Fatal("non-zero status returned, failed to run feature tests")
+	}
+}
+
+func InitializeScenario(ctx *godog.ScenarioContext, t *testing.T) {
+	ctx.StepV2(t, `^the following billable examples$`, theFollowingExamples)
+}

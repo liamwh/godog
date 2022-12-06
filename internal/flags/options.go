@@ -72,6 +72,9 @@ type Options struct {
 
 	// ShowHelp enables suite to show CLI flags usage help and exit.
 	ShowHelp bool
+
+	// UsingV2ScenarioInitializers tells the runner to use the V2 scenario initializer function.
+	UsingV2ScenarioInitializers bool
 }
 
 type Feature struct {
